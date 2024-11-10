@@ -1,16 +1,15 @@
 import express from "express";
 import mysql from "mysql2";
+import chalk from "chalk";
 const app = express();
 
-// Create a connection to the database
 const db = mysql.createConnection({
-  host: "localhost", // Replace with your host
-  user: "root", // Replace with your MySQL username
-  password: "DareDevil@45", // Replace with your MySQL password
+  host: "localhost",
+  user: "root",
+  password: "DareDevil@45",
   database: "url_shortner",
 });
 
-// Connect to the database
 db.connect((err) => {
   if (err) {
     console.error("Error connecting to the database:", err);
@@ -24,10 +23,6 @@ db.query("DESCRIBE url_shortner", (err, schema) => {
   console.log("\nTable: url_shortner");
   console.table(schema);
 });
-
-// db.query("SELECT * FROM url_shortner", (err,values)=>{
-//   console.table(values);
-// });
 
 app.get("/", (req, res) => {
   res.send("Hello World");
@@ -61,26 +56,24 @@ function generateShortUrl(length = 6) {
 function thousandEntries() {
   const startTime = performance.now(); // Start timer
 
-  const values = Array(1)
+  const values = Array(1000000)
     .fill()
     .map(() => ["originalurl.com", generateShortUrl()]);
 
-  const totalRows = values.length; // Store the total number of rows to insert
+  const totalRows = values.length;
 
   db.query(
     "INSERT IGNORE INTO url_shortner (original_url, short_code) VALUES ?",
     [values],
-    (err, result) => {
+    (err, resultMain) => {
+      let resultMini;
+
       if (err) {
         console.error("Error inserting rows:", err);
         return;
       }
-      const endTime = performance.now(); // End timer
-      const duration = (endTime - startTime).toFixed(2); // Get duration in ms
 
-
-      // Check if we need to insert ignored rows
-      const ignoredRows = totalRows - result.affectedRows;
+      const ignoredRows = totalRows - resultMain.affectedRows;
       if (ignoredRows > 0) {
         console.log(`Attempting to insert ${ignoredRows} ignored rows...`);
 
@@ -92,24 +85,32 @@ function thousandEntries() {
           "INSERT IGNORE INTO url_shortner (original_url, short_code) VALUES ?",
           [values],
           (err, result) => {
+            resultMini = result;
             if (err) {
               console.error("Error inserting rows:", err);
               return;
             }
-            console.log(`Successfully inserted ${result.affectedRows} rows second attempt`);
-            // console.log(`Query took ${duration}ms to complete`);
+            console.log(
+              `Successfully inserted ${result.affectedRows} rows second attempt`
+            );
           }
         );
       }
-      console.log(`Successfully inserted ${result.affectedRows} rows`);
-      console.log(`Query took ${duration}ms to complete`);
-
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      console.log(
+        chalk.green(
+          `Successfully inserted sum total of ${resultMain.affectedRows + resultMini?.affectedRows} rows`
+        )
+      );
+      console.log(chalk.blue(`Query took ${duration}ms to complete`));
     }
   );
 }
 
 thousandEntries();
 
+// output size of table
 db.query("SHOW TABLE STATUS LIKE 'url_shortner'", (err, result) => {
   if (err) {
     console.error("Error fetching table status:", err);
@@ -119,15 +120,15 @@ db.query("SHOW TABLE STATUS LIKE 'url_shortner'", (err, result) => {
   const sizeInMB =
     (tableInfo.Data_length + tableInfo.Index_length) / (1024 * 1024);
   console.log(`Size of table 'url_shortner': ${sizeInMB.toFixed(2)} MB`);
-  
+
   // New code to log total number of rows
-  console.log(`Total number of rows in 'url_shortner': ${tableInfo.Rows}`);
 });
 
+//output total no of rows in table
 db.query("SELECT COUNT(*) AS total FROM url_shortner", (err, result) => {
   if (err) {
-    log_error("Error counting rows:", err);
+    console.error("Error counting rows:", err);
     return;
   }
-  log_info(`Total number of rows in 'url_shortner': ${result[0].total}`);
+  console.log(`Total number of rows in 'url_shortner': ${result[0].total}`);
 });
