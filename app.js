@@ -1,6 +1,7 @@
-import express from "express";
 import mysql from "mysql2";
 import chalk from "chalk";
+import express from "express";
+
 const app = express();
 
 const db = mysql.createConnection({
@@ -53,10 +54,10 @@ function generateShortUrl(length = 6) {
   return shortUrl;
 }
 
-function thousandEntries() {
+function insertRows(numberOfRows) {
   const startTime = performance.now(); // Start timer
 
-  const values = Array(1000000)
+  const values = Array(numberOfRows)
     .fill()
     .map(() => ["originalurl.com", generateShortUrl()]);
 
@@ -74,6 +75,9 @@ function thousandEntries() {
       }
 
       const ignoredRows = totalRows - resultMain.affectedRows;
+      console.log(chalk.yellow(`Rows added: ${resultMain.affectedRows}`));
+      console.log(chalk.red(`Rows ignored: ${ignoredRows}`));
+
       if (ignoredRows > 0) {
         console.log(`Attempting to insert ${ignoredRows} ignored rows...`);
 
@@ -91,24 +95,26 @@ function thousandEntries() {
               return;
             }
             console.log(
-              `Successfully inserted ${result.affectedRows} rows second attempt`
+              chalk.green(
+                `Successfully inserted ${result.affectedRows} rows on second attempt`
+              )
             );
           }
         );
       }
+
+      const totalInserted =
+        resultMain.affectedRows + (resultMini?.affectedRows || 0);
       const endTime = performance.now();
       const duration = (endTime - startTime).toFixed(2);
-      console.log(
-        chalk.green(
-          `Successfully inserted sum total of ${resultMain.affectedRows + resultMini?.affectedRows} rows`
-        )
-      );
+
+      console.log(chalk.green(`Total rows added: ${totalInserted}`));
       console.log(chalk.blue(`Query took ${duration}ms to complete`));
     }
   );
 }
 
-thousandEntries();
+insertRows(100000);
 
 // output size of table
 db.query("SHOW TABLE STATUS LIKE 'url_shortner'", (err, result) => {
